@@ -1,4 +1,10 @@
 "use client";
+// Define a minimal interface for SerialPort
+interface MinimalSerialPort {
+  open: (options: { baudRate: number }) => Promise<void>;
+  readable: ReadableStream<Uint8Array>;
+}
+
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,12 +18,10 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { useState, useRef, useEffect } from "react";
 
 export default function Home() {
-  const [port, setPort] = useState<any>(null);
+  // Removed unused 'port'
   const [connected, setConnected] = useState(false);
   const [consoleLines, setConsoleLines] = useState<string[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
   const monitorRef = useRef<HTMLDivElement>(null);
-
 
   const [noteRange, setNoteRange] = useState<number[]>([0, 127]);
   const [transposeAmmount, setTransposeAmmount] = useState<number>(0);
@@ -34,20 +38,19 @@ export default function Home() {
   // Connect to serial device
   const connectSerial = async () => {
     try {
-      // @ts-ignore
+      // @ts-expect-error: navigator.serial is not yet in TypeScript DOM types
       const serialPort = await navigator.serial.requestPort();
-      await serialPort.open({ baudRate: 115200 });
-      setPort(serialPort);
+      await (serialPort as MinimalSerialPort).open({ baudRate: 115200 });
       setConnected(true);
       setConsoleLines(lines => [...lines, "Connected"]);
-      readSerial(serialPort);
+      readSerial(serialPort as MinimalSerialPort);
     } catch (err) {
       setConsoleLines(lines => [...lines, "Connection failed: " + err]);
     }
   };
 
   // Read from serial device
-  const readSerial = async (serialPort: any) => {
+  const readSerial = async (serialPort: MinimalSerialPort) => {
     const decoder = new TextDecoder();
     const reader = serialPort.readable.getReader();
     try {
@@ -65,16 +68,16 @@ export default function Home() {
     }
   };
 
-  // Send command to serial device
-  const sendCommand = async () => {
-    if (!port || !inputRef.current) return;
-    const command = inputRef.current.value;
-    const writer = port.writable.getWriter();
-    await writer.write(new TextEncoder().encode(command + "\n"));
-    writer.releaseLock();
-    setConsoleLines(lines => [...lines, "→ " + command]);
-    inputRef.current.value = "";
-  };
+  // // Send command to serial device
+  // const sendCommand = async () => {
+  //   if (!port || !inputRef.current) return;
+  //   const command = inputRef.current.value;
+  //   const writer = port.writable.getWriter();
+  //   await writer.write(new TextEncoder().encode(command + "\n"));
+  //   writer.releaseLock();
+  //   setConsoleLines(lines => [...lines, "→ " + command]);
+  //   inputRef.current.value = "";
+  // };
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
@@ -91,7 +94,7 @@ export default function Home() {
                   Welcome to the Thonk Synth t10 Midi-CV Settings Editor. This tool is still under development..
                 </p>
                 <p>
-                  To get started, click the 'Connect' button below.
+                  To get started, click the Connect button below.
                 </p>
 
               </CardContent>
