@@ -1,103 +1,250 @@
-import Image from "next/image";
+"use client";
+
+import { ThemeProvider } from "@/components/theme-provider";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+
+
+
+
+import { useState, useRef, useEffect } from "react";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [port, setPort] = useState<any>(null);
+  const [connected, setConnected] = useState(false);
+  const [consoleLines, setConsoleLines] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const monitorRef = useRef<HTMLDivElement>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+  const [noteRange, setNoteRange] = useState<number[]>([0, 127]);
+  const [transposeAmmount, setTransposeAmmount] = useState<number>(0);
+  const [glideAmmount, setGlideAmmount] = useState<number>(0);
+  const [bendAmmount, setBendAmmount] = useState<number>(2);
+
+  // Auto-scroll when new messages come in
+  useEffect(() => {
+    if (monitorRef.current) {
+      monitorRef.current.scrollTop = monitorRef.current.scrollHeight;
+    }
+  }, [consoleLines]);
+
+  // Connect to serial device
+  const connectSerial = async () => {
+    try {
+      // @ts-ignore
+      const serialPort = await navigator.serial.requestPort();
+      await serialPort.open({ baudRate: 115200 });
+      setPort(serialPort);
+      setConnected(true);
+      setConsoleLines(lines => [...lines, "Connected"]);
+      readSerial(serialPort);
+    } catch (err) {
+      setConsoleLines(lines => [...lines, "Connection failed: " + err]);
+    }
+  };
+
+  // Read from serial device
+  const readSerial = async (serialPort: any) => {
+    const decoder = new TextDecoder();
+    const reader = serialPort.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          setConsoleLines(lines => [...lines, "← " + decoder.decode(value)]);
+        }
+      }
+    } catch (err) {
+      setConsoleLines(lines => [...lines, "Read error: " + err]);
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
+  // Send command to serial device
+  const sendCommand = async () => {
+    if (!port || !inputRef.current) return;
+    const command = inputRef.current.value;
+    const writer = port.writable.getWriter();
+    await writer.write(new TextEncoder().encode(command + "\n"));
+    writer.releaseLock();
+    setConsoleLines(lines => [...lines, "→ " + command]);
+    inputRef.current.value = "";
+  };
+
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <div className="grid grid-rows-[20px_1fr_20px] min-h-screen max-w-3xl mx-auto p-8 pb-20 gap-10 font-[family-name:var(--font-geist-mono)]">
+        <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
+          <header className="text-3xl text-center mx-auto">Thonk Synth t10 Midi-CV Editor</header>
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="col-span-2">
+              <CardHeader>
+                <CardTitle>About</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-4">
+                  Welcome to the Thonk Synth t10 Midi-CV Settings Editor. This tool is still under development..
+                </p>
+                <p>
+                  To get started, click the 'Connect' button below.
+                </p>
+
+              </CardContent>
+            </Card>
+
+
+            <Card className="col-span-2">
+              <CardContent>
+                <p className="flex justify-center mb-4">
+                  <Button onClick={connectSerial} disabled={connected} className="w-full"> Connect </Button>
+                </p>
+                <Card>
+                  <CardContent>
+                    <div
+                      ref={monitorRef}
+                      style={{
+                        height: 200,
+                        overflowY: "auto",
+                        fontFamily: "monospace"
+                      }}
+                    >
+                      {consoleLines.map((line, i) => <div key={i}>{line}</div>)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Note Output</CardTitle>
+              </CardHeader>
+              <CardContent>
+
+                <p className="mb-2">
+                  <HoverCard>
+                    <HoverCardTrigger>
+                      Note Range: {noteRange[0]} to {noteRange[1]}
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      Select the MIDI note range to output. Notes outside this range will be ignored.
+                    </HoverCardContent>
+                  </HoverCard>
+                </p>
+                <p className="mb-8">
+                  <Slider min={0} max={127} step={1} minStepsBetweenThumbs={1} value={noteRange} onValueChange={setNoteRange} />
+                </p>
+
+                <p className="mb-2">
+                  <HoverCard>
+                    <HoverCardTrigger>
+                      Transpose: {transposeAmmount}
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      Transpose the note output in semitones.
+                    </HoverCardContent>
+                  </HoverCard>
+                </p>
+                <p className="mb-8">
+                  <Slider min={-12} max={12} step={1} value={[transposeAmmount]} onValueChange={([val]) => setTransposeAmmount(val)} />
+                </p>
+
+                <p className="mb-2">
+                  <HoverCard>
+                    <HoverCardTrigger>
+                      Glide: {glideAmmount} ms
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      Apply a glide between notes.
+                    </HoverCardContent>
+                  </HoverCard>
+                </p>
+                <p className="mb-8">
+                  <Slider min={0} max={500} step={1} value={[glideAmmount]} onValueChange={([val]) => setGlideAmmount(val)} />
+                </p>
+
+                <p className="mb-2">
+                  <HoverCard>
+                    <HoverCardTrigger>
+                      Pitch Bend Range: +/- {bendAmmount}
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      Set the pitch bend range.
+                    </HoverCardContent>
+                  </HoverCard>
+                </p>
+                <p className="mb-8">
+                  <Slider min={0} max={24} step={1} value={[bendAmmount]} onValueChange={([val]) => setBendAmmount(val)} />
+                </p>
+
+
+
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Gate Output</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>
+                  The note output is a 12 bit value that is sent to the t10. The value is
+                  calculated from the note and octave.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Vel Output</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>
+                  The note output is a 12 bit value that is sent to the t10. The value is
+                  calculated from the note and octave.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>CC Output</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>
+                  The note output is a 12 bit value that is sent to the t10. The value is
+                  calculated from the note and octave.
+                </p>
+              </CardContent>
+            </Card>            <Card>
+              <CardHeader>
+                <CardTitle>Clock Output</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>
+                  The note output is a 12 bit value that is sent to the t10. The value is
+                  calculated from the note and octave.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Reset Output</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>
+                  The note output is a 12 bit value that is sent to the t10. The value is
+                  calculated from the note and octave.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+        <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
+          <a href="https://www.thonk.co.uk">thonk.co.uk</a>
+        </footer>
+      </div>
+    </ThemeProvider>
   );
 }
